@@ -49,17 +49,13 @@ def autoFarm(runState = 0):
 			elif(totalCount == 0):
 				if( (get_pos_x(),get_pos_y()) in entitydata.swapDict):
 					entitydata.swapDict.pop( (get_pos_x(),get_pos_y()) )			
-		elif(runState == 2):
-			fertilizer.undoHere()
-
 		if(get_pos_x() == minX and get_pos_y() == minY): #end point reached
 			if(runState == 0):
 				return autoFarm(runState+1)
 			elif(runState == 1):
 				if(entitydata.countSwap() > 0):
 					return autoFarm(runState) 
-				return autoFarm(runState+1)
-			elif(runState == 2):
+				
 				if(can_harvest()):
 					plant.harvestHere() 
 				return True
@@ -70,6 +66,5 @@ def autoFarm(runState = 0):
 				if(moveFailCount >= 2):
 					return False
 				movePos = mover.getNextXY(movePos[0],movePos[1]) #get next pos target
-
-	return True
+	return False
 	

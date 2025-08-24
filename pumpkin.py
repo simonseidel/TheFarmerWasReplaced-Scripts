@@ -2,6 +2,7 @@ import entitydata
 import worldsize
 import mover
 import plant
+import fertilizer
 
 def autoFarm(runState = 0):
 	if(runState < 0 or runState > 1):
@@ -18,12 +19,12 @@ def autoFarm(runState = 0):
 
 	while True:
 		if(runState == 0):
-			if(plant.putHere(Entities.Pumpkin) == False):
+			if( get_entity_type() != Entities.Pumpkin and plant.putHere(Entities.Pumpkin, True) == False):
 				return False
 		elif(runState == 1):
 			if(get_entity_type() == None):
 				entitydata.initEntity( (get_pos_x(),get_pos_y()) )
-				return autoFarm(0) #plant again
+				return autoFarm(runState-1) #plant again
 			
 			fertilizer.undoHere()
 		if(get_pos_x() == minX and get_pos_y() == minY): #end point reached
@@ -34,8 +35,7 @@ def autoFarm(runState = 0):
 					if(can_harvest()):
 						plant.harvestHere()
 					return True
-				else:
-					return autoFarm(runState)
+				return autoFarm(runState)
 		else:
 			moveFailCount = 0
 			while(mover.moveTowardsXY(movePos[0],movePos[1]) == False):

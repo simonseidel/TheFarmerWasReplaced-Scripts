@@ -1,15 +1,15 @@
 typeDict = {} #location and entity type
-companionDict = {} #companion location and entity type
+companionDict = {} #companion location and (entityType,isPlanted)
 sizeDict = {} #location and size
 swapDict = {} #amount of swaps performed
 infectedSet = set() #a set containing infected entities
 
 def init():
-	typeDict = {} #location and entity type
-	companionDict = {} #companion location and entity type
-	sizeDict = {} #location and size
-	swapDict = {} #amount of swaps performed
-	infectedSet = set() #a set containing infected entities
+	typeDict = {}
+	companionDict = {} 
+	sizeDict = {} 
+	swapDict = {} 
+	infectedSet = set()
 
 def initEntity(pos):
 	if pos in typeDict:

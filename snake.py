@@ -30,14 +30,15 @@ def runGame(runState = 0, applePos = None):
 	while(mover.moveTowardsXY(movePos[0],movePos[1])):
 		pass
 
-	while True:
+	gameRunning = True
+	while gameRunning == True:
 		if(runState == 0): #tilling State
 			if(get_ground_type() != Grounds.Soil):
 				till()
 		elif(runState == 1):
 			if(applePos == None):
 				gameRunning = False
-				return False
+				break
 			
 			if(applePos != None and get_pos_x() == applePos[0] and get_pos_y() == applePos[1]):
 				applePos = measure()
@@ -56,11 +57,12 @@ def runGame(runState = 0, applePos = None):
 				moveFailCount = moveFailCount+1 #move failed +1
 					
 				if(moveFailCount >= 2):
-					return True
+					gameRunning = False
+					break
 
 				movePos = mover.getNextXY(movePos[0],movePos[1]) #get next pos target
 	
-	if(runState == 1):
+	if(runState == 1 and gameRunning == False):
 		change_hat(Hats.Straw_Hat) #remove "snake hat"
 	
 	return True	

@@ -56,6 +56,9 @@ def undoHere():
 	if not(len(affectedSet) == len(infectedInSet)):
 		return False #use if it only affects infected plants
 	
+	if(num_items(Items.Weird_Substance) == 0):
+		return False
+	
 	use_item(Items.Weird_Substance)
 	for pos in affectedSet:
 		if( pos in infectedInSet ):

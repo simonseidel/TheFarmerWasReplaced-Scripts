@@ -24,8 +24,6 @@ def autoFarm(runState = 0):
 				return False
 			entitydata.sizeDict[(get_pos_x(),get_pos_y())] = measure()
 		elif(runState == 1):
-			fertilizer.undoHere()
-		elif(runState == 2):
 			if(biggestSize == None):
 				biggestSize = entitydata.getBiggest()
 
@@ -40,8 +38,6 @@ def autoFarm(runState = 0):
 			if(runState == 0):
 				return autoFarm(runState+1) 
 			elif(runState == 1):
-				return autoFarm(runState+1)
-			elif(runState == 2):
 				return autoFarm(runState)
 		else:
 			moveFailCount = 0
