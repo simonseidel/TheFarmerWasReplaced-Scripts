@@ -1,47 +1,40 @@
-import entitydata
 import worldsize
 import mover
-import plant
-import fertilizer
 
-def autoFarm(runState = 0):
-	if(runState < 0 or runState > 1):
-		return False
-
-	if(runState == 0):
-		entitydata.init()
-
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
-
-	movePos = minX+1,minY #go to starting point
-	while(mover.moveTowardsXY(movePos[0],movePos[1])):
-		pass
-
-	while True:
-		if(runState == 0):
-			if( get_entity_type() != Entities.Pumpkin and plant.putHere(Entities.Pumpkin, True) == False):
-				return False
-		elif(runState == 1):
-			if(get_entity_type() == None):
-				entitydata.initEntity( (get_pos_x(),get_pos_y()) )
-				return autoFarm(runState-1) #plant again
-			
-			fertilizer.undoHere()
-		if(get_pos_x() == minX and get_pos_y() == minY): #end point reached
-			if(runState == 0):
-				return autoFarm(runState+1)
-			elif(runState == 1):
-				if(entitydata.countType() == worldsize.getEntityMaxCount()):
-					if(can_harvest()):
-						plant.harvestHere()
-					return True
-				return autoFarm(runState)
-		else:
-			moveFailCount = 0
-			while(mover.moveTowardsXY(movePos[0],movePos[1]) == False):
-				moveFailCount = moveFailCount+1 #move failed +1
-				if(moveFailCount >= 2):
-					return False
-				movePos = mover.getNextXY(movePos[0],movePos[1]) #get next pos target
+def autoFarm():
+	runState = 0
 	
-	return True #finished
+	mover.moveToPos( mover.getCircuitStartPos() )
+	
+	directionList = mover.getCircuitDirectionList()
+
+	while(True):
+		pumpkinCount = 0
+		
+		for dir in directionList: #plant all pumpkins
+			if(runState == 0):	
+				if( get_entity_type() != Entities.Pumpkin):
+					plant(Entities.Pumpkin)
+					
+					if( num_items(Items.Water) > 0 and get_water() < 0.25):
+						use_item(Items.Water)					
+			elif(runState == 1):
+				if( get_entity_type() != Entities.Pumpkin):				
+					plant(Entities.Pumpkin)
+					if( num_items(Items.Water) > 0 and get_water() < 0.25):
+						use_item(Items.Water)
+
+					runState = runState-1
+				else:
+					pumpkinCount = pumpkinCount+1
+			if( (get_pos_x(),get_pos_y()) == mover.getCircuitEndPos()):
+				if(runState == 0):
+					runState = runState+1
+				elif(runState == 1):
+					if(pumpkinCount == worldsize.getEntityMaxCount()):
+						if( can_harvest() and harvest() == True):
+							return True
+					else:
+						runState = runState-1
+			move(dir)
+

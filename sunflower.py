@@ -1,50 +1,121 @@
-import entitydata
-import worldsize
 import mover
-import plant
-import fertilizer
+import planter
+import worldsize
 
-def autoFarm(runState = 0):
-	if(runState < 0 or runState > 2):
-		return False
+timeDict = {} #gettime when planted
+sizeDict = {} #location and size
 
-	biggestSize = None
-	if(runState == 0):
-		entitydata.init()
+def init():
+	timeDict = {} #gettime when planted
+	sizeDict = {} #location and size
 
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
+def getHarvestSet( ):
+	#this set will contain all of the unique sizes on the grid, in unsorted order
+	unsortedSizeSet = set()
+	for sunflowerPos in sizeDict:
+		thisSize = sizeDict[sunflowerPos]
+		unsortedSizeSet.add( thisSize )
 
-	movePos = minX+1,minY #go to starting point
-	while(mover.moveTowardsXY(movePos[0],movePos[1])):
-		pass
+	#sizes sorted in descending order
+	sortedSizeSet = set()
+	
+	while( len(unsortedSizeSet) > 0):
+		savedSize = None
+		for size in unsortedSizeSet:
+			if(savedSize == None or size > savedSize):
+				savedSize = size
 
-	while True:
-		if(runState == 0):
-			if(plant.putHere(Entities.Sunflower) == False):
-				return False
-			entitydata.sizeDict[(get_pos_x(),get_pos_y())] = measure()
-		elif(runState == 1):
-			if(biggestSize == None):
-				biggestSize = entitydata.getBiggest()
+		sortedSizeSet.add(savedSize)
+		unsortedSizeSet.remove(savedSize)
+	
+	#this set will contain the biggest sizes in descending order, with growtime in descending order
+	# example: 
+	# 0: size=15 growtime 3
+	# 1: size=15 growtime 2
+	# 2: size=14 growtime 5
+	# 3: size=14 growtime 4
+	sortedHarvestSet = set()
 
-			if( (get_pos_x(),get_pos_y()) in entitydata.sizeDict):
-				if(can_harvest() and measure() >= biggestSize):
-					plant.harvestHere()
+	for size in sortedSizeSet:
 
-					if(entitydata.countSize() == 0):
-						return True
+		#this set will contain all entities with this size, in unsorted order
+		unsortedHarvestSet = set()
+		
+		for sunflowerPos in sizeDict:
+			thisSize = sizeDict[sunflowerPos]
+			if(thisSize == size):
+				unsortedHarvestSet.add( sunflowerPos )
 
-		if(get_pos_x() == minX and get_pos_y() == minY): #end point reached
-			if(runState == 0):
-				return autoFarm(runState+1) 
-			elif(runState == 1):
-				return autoFarm(runState)
+		while( len(unsortedHarvestSet) > 0):
+			savedGrowTime = None
+			savedPos = None
+		
+			for sunflowerPos in unsortedHarvestSet:
+				plantTime = timeDict[sunflowerPos]
+				growTime = get_time() - plantTime
+				if( savedPos == None or growTime > savedGrowTime):
+					savedPos = sunflowerPos
+					savedGrowTime = growTime
+			
+			unsortedHarvestSet.remove(savedPos)
+			sortedHarvestSet.add(savedPos)
+
+	return sortedHarvestSet
+	
+
+def autoFarm():
+	init() 
+	
+	mover.moveToPos( mover.getZigZagStartPos() )
+	
+	directionList = mover.getZigZagDirectionList()
+	
+	fertilizeAll = planter.canAffordFertilize( num_items(Items.Fertilizer) )
+
+	irrigateLevel = planter.getIrrigateLevel( num_items(Items.Water) )
+	
+	for dir in directionList:
+		if( planter.plantHere(Entities.Sunflower) == True ):
+			pos = ( get_pos_x(),get_pos_y() )
+			timeDict[pos] = get_time()
+			sizeDict[pos] = measure()
 		else:
-			moveFailCount = 0
-			while(mover.moveTowardsXY(movePos[0],movePos[1]) == False):
-				moveFailCount = moveFailCount+1 #move failed +1
-				if(moveFailCount >= 2):
-					return False
-				movePos = mover.getNextXY(movePos[0],movePos[1]) #get next pos target
+			return False
 
-	return True #finished
+		if(fertilizeAll == True):
+			planter.fertilizeHere()
+
+		if(irrigateLevel > 0):
+			planter.irrigateHere(irrigateLevel)
+
+		if(dir != None):
+			move(dir)
+
+	unfertilizeAll = False
+	if( fertilizeAll == True and planter.canAffordUnfertilize( num_items(Items.Weird_Substance) ) ):
+		unfertilizeAll = True
+
+	if( unfertilizeAll == True ):
+		directionList = mover.reverseZigZag(directionList)
+
+		for dir in directionList:
+			planter.unFertilizeHere()
+			
+			if(dir != None):
+				move(dir)
+
+	harvestSet = getHarvestSet()
+	for pos in harvestSet:
+		mover.moveToPos(pos)
+
+		while(True):
+			if ( can_harvest() ):
+				if(planter.harvestHere() == True):
+					if( pos in timeDict):
+						timeDict.pop(pos)
+					if( pos in sizeDict):
+						sizeDict.pop(pos)
+				break
+			else:
+				planter.irrigateHere(irrigateLevel)
+	return True

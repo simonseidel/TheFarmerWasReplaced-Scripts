@@ -1,16 +1,38 @@
-import entitydata
 import maze
 import cactus
-import plant
+import planter
 import mover
 import sunflower
 import worldsize
 import snake
-import autounlock
 import pumpkin
-import fertilizer
-import helper
-import tree
+import misc
+import polyculture
+
+def getItemEntities(item):
+	itemDict = {
+		Items.Hay:[Entities.Grass],
+		Items.Wood:[Entities.Tree,Entities.Bush],
+		Items.Carrot:[Entities.Carrot],
+		Items.Pumpkin:[Entities.Pumpkin],
+		Items.Cactus:[Entities.Cactus],
+		Items.Bone:[Entities.Apple,Entities.Dinosaur],
+		Items.Weird_Substance:[None],
+		Items.Gold:[Entities.Bush,Entities.Hedge,Entities.Treasure],
+		Items.Water:[None],
+		Items.Fertilizer:[None],
+		Items.Power:[Entities.Sunflower]
+		#Items.Piggy:[None]		
+	}
+	entityList = [None]
+	if(item in itemDict):
+		entityList = itemDict[item]
+	return entityList
+
+def getItemEntity(item):
+	entityList = getItemEntities(item)
+	randomIdx = random() * len(entityList) // 1
+	return entityList[randomIdx]
 
 def getMinInventoryItem():
 	checkItemSet = {
@@ -33,37 +55,33 @@ def getMinInventoryItem():
 		Items.Power
 	}
 
-	minItem = None
+	savedItem = None
 	for item in checkItemSet:
 		if item in plantableItemSet:
-			entity = plant.getItemEntity(item)
+			entity = getItemEntity(item)
 			maxEntityCount = worldsize.getEntityMaxCount()
-			if not( plant.canAffordToPlant(entity, maxEntityCount) ):
+			if not( planter.canAffordToPlant(entity, maxEntityCount) ):
 				break #skip, cannot afford to plant this
-			
-		if(item == Items.Power and num_items(Items.Power) < 1000):
-			return Items.Power
-		
+				
 		if(item == Items.Gold and not maze.canAffordCreate()):
 			continue
 
 		if(item == Items.Bone and not snake.canAffordGame()):
 			continue
 
-		if(minItem == None or num_items(item) < num_items( minItem )):
-			if(item == Items.Power):
-				continue
-			minItem = item
-	return minItem
+		if(savedItem == None or num_items(item) < num_items( savedItem )):
+			savedItem = item
+	return savedItem
 
 def main():
-	plant.autoTill(Grounds.Soil)
+	planter.autoTill(Grounds.Soil)
 	
 	if(worldsize.setEven()):
 		quick_print("world decreased to even size")
 	
 	while(True):
-		minItem = getMinInventoryItem()	
+		#minItem = getMinInventoryItem()	
+		minItem = Items.Gold
 		
 		if( minItem == Items.Power ):
 			sunflower.autoFarm()
@@ -75,14 +93,11 @@ def main():
 			pumpkin.autoFarm()
 		elif( minItem == Items.Cactus):
 			cactus.autoFarm()
-		elif( minItem == Items.Wood):
-			tree.autoFarm()
 		elif( minItem != None):
-			plant.autoFarmEntity( plant.getItemEntity(minItem) )
+			polyculture.autoFarmEntity( planter.getItemEntity(minItem) )
 		else:
 			break #error
-	return False
+	return False	
 
+clear()
 main()
-
-

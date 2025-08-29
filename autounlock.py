@@ -1,11 +1,3 @@
-import plant
-import maze
-import snake
-import worldsize
-import sunflower
-import pumpkin
-import cactus
-
 def attemptAutoUnlock():
 	unlockCount = 0
 	for u in Unlocks:

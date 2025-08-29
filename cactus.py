@@ -1,8 +1,5 @@
-import entitydata
 import worldsize
 import mover
-import plant
-import fertilizer
 
 def autoSwap(minX, maxX, minY, maxY):
 	x = get_pos_x()
@@ -19,52 +16,33 @@ def autoSwap(minX, maxX, minY, maxY):
 		swapCount = swapCount + 1
 	return swapCount
 
-def autoFarm(runState = 0):
-	if(runState < 0 or runState > 2):
-		return False
+def autoFarm():
+	runState = 0
 
-	if(runState == 0):
-		entitydata.init()
-
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
-
-	movePos = minX+1,minY #go to starting point
-	while(mover.moveTowardsXY(movePos[0],movePos[1])):
-		pass
-
-	while True:
-		if(runState == 0):
-			if(plant.putHere(Entities.Cactus) == False):
-				return False
-		elif(runState == 1):
-			totalCount = 0
-			while(True):
-				thisCount = autoSwap(minX, maxX, minY, maxY)
-				if(thisCount == 0):
-					break
-				totalCount = totalCount + thisCount
-
-			if(totalCount > 0):
-				entitydata.swapDict[(get_pos_x(),get_pos_y())] = totalCount
-			elif(totalCount == 0):
-				if( (get_pos_x(),get_pos_y()) in entitydata.swapDict):
-					entitydata.swapDict.pop( (get_pos_x(),get_pos_y()) )			
-		if(get_pos_x() == minX and get_pos_y() == minY): #end point reached
-			if(runState == 0):
-				return autoFarm(runState+1)
-			elif(runState == 1):
-				if(entitydata.countSwap() > 0):
-					return autoFarm(runState) 
-				
-				if(can_harvest()):
-					plant.harvestHere() 
-				return True
-		else:
-			moveFailCount = 0
-			while(mover.moveTowardsXY(movePos[0],movePos[1]) == False):
-				moveFailCount = moveFailCount+1 #move failed +1
-				if(moveFailCount >= 2):
-					return False
-				movePos = mover.getNextXY(movePos[0],movePos[1]) #get next pos target
-	return False
+	mover.moveToPos( mover.getCircuitStartPos() )
 	
+	directionList = mover.getCircuitDirectionList()
+	
+	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
+	
+	while True:
+		loopSwapCount = 0
+		for dir in directionList:
+			if(runState == 0):
+				if(plant(Entities.Cactus) == False):
+					return False
+			elif(runState == 1):
+				while(True):
+					thisCount = autoSwap(minX, maxX, minY, maxY)
+					if(thisCount == 0):
+						break
+					loopSwapCount = loopSwapCount + thisCount	
+			
+			if( ( get_pos_x(),get_pos_y() ) == mover.getCircuitEndPos() ):
+				if(runState == 0):
+					runState = runState+1
+				elif(runState == 1):
+					if( loopSwapCount == 0 and can_harvest() and harvest() == True):
+						return True
+			move(dir)
+	return False
