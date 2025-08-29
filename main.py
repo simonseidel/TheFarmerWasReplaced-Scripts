@@ -61,7 +61,7 @@ def getMinInventoryItem():
 			entity = getItemEntity(item)
 			maxEntityCount = worldsize.getEntityMaxCount()
 			if not( planter.canAffordToPlant(entity, maxEntityCount) ):
-				break #skip, cannot afford to plant this
+				continue #skip, cannot afford to plant this
 				
 		if(item == Items.Gold and not maze.canAffordCreate()):
 			continue
