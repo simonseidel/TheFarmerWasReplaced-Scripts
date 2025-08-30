@@ -1,31 +1,45 @@
-import worldsize
+import misc
 
-directionList = [North,East,South,West]
+isInitialized = False
 successDirectionSet = set() # {(x,y,direction)}
 unknownDirectionSet = set() # {(x,y,direction)}
-lastDirectionDict = {}      # {(x,y)} = direction
+lastDirectionDict = {} # {(x,y)} = direction
 
-def init():
+def init( doOptimization ):
+	preTick = get_tick_count()
+	quick_print("maze.init() was called")
+
+	global isInitialized
+	global successDirectionSet # {(x,y,direction)}
+	global unknownDirectionSet # {(x,y,direction)}
+	global lastDirectionDict # {(x,y)} = direction
+	
+	isInitialized = True
 	successDirectionSet = set()
 	unknownDirectionSet = set()
 	lastDirectionDict = {}
 	
-def optimize():
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
+	directionList = [North,East,South,West]
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+	
 
-	idx = 0
-	while(idx < get_world_size() * get_world_size()):
+	addUnknownCount = 0
+	for idx in range( misc.getEntityMaxCount() ):
 		x = (idx % get_world_size())
 		y = (idx / get_world_size()) // 1
-
+		
 		for dir in directionList:
-			if(	(x == minX and dir == West) or (x == maxX and dir == East) or (y == minY and dir == South) or (y == maxY and dir == North)	):
-				continue	
+			if( doOptimization ):
+				if(	(x == minX and dir == West) or (x == maxX and dir == East) or (y == minY and dir == South) or (y == maxY and dir == North)	):
+					continue	
+			
 			unknownDirectionSet.add((x,y,dir))
-		idx = idx+1
-
+			addUnknownCount = addUnknownCount+1
+	
+	quick_print("DEBUG: maze.init() executed in", get_tick_count()-preTick, "ms", "with doOptimization =",doOptimization)
+	return addUnknownCount
+	
 def saveMove(moveSuccessful, moveDirection, fromPos):
-	preTick = get_tick_count()
 	(fromX,fromY) = fromPos
 	
 	#remove unknown
@@ -43,7 +57,6 @@ def saveMove(moveSuccessful, moveDirection, fromPos):
 		if( (fromX,fromY,moveDirection) in successDirectionSet ):
 			successDirectionSet.remove( (fromX,fromY,moveDirection) )
 
-	quick_print("DEBUG: saveMove executed in", get_tick_count()-preTick, "ms")
 	return True #success
 
 
@@ -54,7 +67,7 @@ def canAffordCreate():
 	return True
 
 def getPosFromDirection(fromPos, direction):
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
 	(fromX,fromY) = fromPos
 	toX = fromX
 	toY = fromY
@@ -80,7 +93,9 @@ def getPosFromDirection(fromPos, direction):
 	return (toX,toY)
 
 def turnDegrees(direction, degrees):
+	directionList = [North,East,South,West]
 	directionIdx = None
+	
 	for idx in range( len(directionList) ):
 		if(directionList[idx] == direction):
 			directionIdx = idx
@@ -96,19 +111,20 @@ def turnDegrees(direction, degrees):
 	turnCount = (degrees / 90) #amount of 90 degree turns
 	newIndex = (directionIdx + turnCount) % 4 #new direction index
 	return directionList[newIndex] #new direction
-	
-def getOppositeDirection(direction):
-	return turnDegrees(direction, 180)
 
 def getUnknownDirectionsAtPos(x,y):
+	directionList = [North,East,South,West]
 	unknownDirectionList = []
+
 	for dir in directionList:
 		if ((x,y,dir) in unknownDirectionSet):
 			unknownDirectionList.append(dir)
 	return unknownDirectionList
 
 def getSuccessDirectionsAtPos(x,y):
+	directionList = [North,East,South,West]
 	successDirectionList = []
+
 	for dir in directionList:
 		if ((x,y,dir) in successDirectionSet):
 			successDirectionList.append(dir)
@@ -125,19 +141,20 @@ def createMaze():
 	use_item(Items.Weird_Substance, get_world_size() * num_unlocked(Unlocks.Mazes))
 	return True
 
-def autoPathFind():
+def autoPathFind( ):
 	if(createMaze() == False):
 		return False
 
-	init() #initialize default values
-	optimize() #avoid some movements at corners etc
-	eraseDeadEnd = False #used for removing deadend paths
+	init( False )
 	
-	while(get_entity_type() != Entities.Treasure):
+	getEntity = get_entity_type()
+	fromX = get_pos_x()
+	fromY = get_pos_y()
+
+	while( getEntity != Entities.Treasure ):
+		eraseDeadEnd = False
 		moveDirection = None
-		fromX = get_pos_x()
-		fromY = get_pos_y()
-		
+
 		while(moveDirection == None):
 			unknownDir = getUnknownDirectionsAtPos(fromX,fromY)
 			successDir = getSuccessDirectionsAtPos(fromX,fromY)
@@ -162,44 +179,47 @@ def autoPathFind():
 					moveDirection = successDir[randomIdx] 
 				else:
 					moveDirection = turnDegrees(lastDirection, 90)
-					
 					successSet = listToSet(successDir) #get successful directions, but in a set
+
 					while( not moveDirection in successSet ):
-						moveDirection = turnDegrees(lastDirection, 90)	
+						moveDirection = turnDegrees(moveDirection, 90)	
 						
-			elif(len(unknownDir) == 0 and len(successDir) == 0):
+			elif( len(unknownDir) == 0 and len(successDir) == 0 ):
 				break #all paths are explored but all failed (error)
 
 		if(moveDirection == None):
-			break #error
+			init( False )
+			quick_print("failed to find a move")
+			continue
 
-		# attempt move
-		moveSuccessful = move(moveDirection)
+		moveSuccessful = move(moveDirection) # attempt move
 
 		if(eraseDeadEnd == True):
 			saveMove(False, moveDirection, (fromX,fromY) ) #erase this movement
 			
 			(nextX,nextY) = getPosFromDirection( (fromX,fromY), moveDirection )
 			if( (nextX,nextY) != (fromX,fromY) ):
-				saveMove(False, getOppositeDirection(moveDirection), (nextX,nextY) ) #erase this movement	
-
-			eraseDeadEnd = False
+				oppositeDirection = turnDegrees(moveDirection, 180)
+				saveMove(False, oppositeDirection, (nextX,nextY) ) #erase this opposite movement	
 		else:
-			saveMove(moveSuccessful, moveDirection, (fromX,fromY) )
+			saveMove(moveSuccessful, moveDirection, (fromX,fromY) ) #save this movement
 			
 			(nextX,nextY) = getPosFromDirection((fromX,fromY), moveDirection)
 			if( (nextX,nextY) != (fromX,fromY) ):
-				saveMove(moveSuccessful, getOppositeDirection(moveDirection), (nextX,nextY) )
+				oppositeDirection = turnDegrees(moveDirection, 180)
+				saveMove(moveSuccessful, oppositeDirection, (nextX,nextY) ) #save this opposite movement
 		
 		if( moveSuccessful == False ):
-			continue #move failed, try another one
+			continue
 
 		#save this direction in this position for later
 		lastDirectionDict[(fromX,fromY)] = moveDirection
+		
+		(fromX,fromY) = getPosFromDirection( (fromX,fromY), moveDirection )
+#		if( (fromX,fromY) != ( get_pos_x(),get_pos_y() ) ):
+#			quick_print("ERROR position is off!")
 
-	isSuccess = get_entity_type() == Entities.Treasure
-	if(isSuccess == False):
-		clear() #clear the maze
-	else:
-		harvest() #harvest the treasure, this removes the maze
-	return isSuccess
+		getEntity = get_entity_type()
+
+	harvest()
+	return getEntity == Entities.Treasure

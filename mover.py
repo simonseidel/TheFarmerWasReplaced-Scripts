@@ -1,4 +1,41 @@
-import worldsize
+import misc
+
+isInitialized = False
+overlapList = []
+overlapList = []
+circuitList = []
+zigZagList = []
+zigZagReverseList = []
+usedWorldSize = None
+
+def init( ):
+	quick_print("mover.init() was called")
+
+	if( misc.isOdd( get_world_size() ) ):
+		quick_print("mover: world decreased to even size")
+		set_world_size( get_world_size()-1 )
+	
+	global isInitialized
+	global overlapList
+	global circuitList
+	global zigZagList
+	global zigZagReverseList
+	global usedWorldSize
+	
+	isInitialized = True
+	overlapList = []
+	circuitList = []
+	zigZagList = []
+	zigZagReverseList = []
+	usedWorldSize = get_world_size()
+	
+	overlapList = getOverlapDirectionList()
+	circuitList = getCircuitDirectionList()
+	zigZagList = getZigZagDirectionList(True)
+	zigZagReverseList = getZigZagDirectionList(False)
+
+def getOverlapStartPos():
+	return (0,0)
 
 def getCircuitEndPos():
 	return (0,0)
@@ -8,21 +45,50 @@ def getCircuitStartPos():
 
 def getZigZagStartPos():
 	return (0,0)
-	
-def getCircuitDirectionList():
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
-	currentPos = getCircuitStartPos()
+
+def getZigZagEndPos():
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+	if( misc.isEven( get_world_size() ) ):
+		return (minX,maxY)
+	else:
+		return (maxX,maxY)
+
+def getOverlapDirectionList():
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+	currentPos = getOverlapStartPos()
 	returnList = []
 	
 	while( True ):
-		if(currentPos == getCircuitStartPos()):
-			#go east from starting point to maxX
-			while( True ):
-				returnList.append(East)
-				currentPos = (currentPos[0]+1,currentPos[1])
-				if( currentPos[0] == maxX ):
-					break
+		if( currentPos[1] == minY ):
+			while( currentPos[1] < maxY ):
+				returnList.append(North)
+				currentPos = (currentPos[0],currentPos[1]+1)
 
+		if( currentPos[1] == maxY ):
+			returnList.append(North) #next row
+			returnList.append(East) #next column
+			
+			if( currentPos[0] == maxX ):
+				currentPos = getOverlapStartPos()
+				break
+			else:
+				currentPos = (currentPos[0]+1,minY)
+
+	return returnList
+
+def getCircuitDirectionList():
+	if misc.isOdd( usedWorldSize ):
+		return None #not possible
+
+	returnList = []
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+
+	currentPos = getCircuitStartPos()
+	while( currentPos[0] < maxX ):
+		returnList.append(East)
+		currentPos = (currentPos[0]+1,currentPos[1])
+
+	while( currentPos != getCircuitEndPos() ):
 		if(currentPos[0] == maxX and currentPos[1] < maxY):
 			#go north, then west
 			returnList.append(North)
@@ -39,31 +105,25 @@ def getCircuitDirectionList():
 			#go north, then east
 			returnList.append(North)
 			currentPos = (currentPos[0],currentPos[1]+1)
-			while(True):
+			while( currentPos[0] < maxX ):
 				returnList.append(East)
 				currentPos = (currentPos[0]+1,currentPos[1])
-				if(currentPos[0] == maxX):
-					break
 
 		if( currentPos == (minX,maxY) ):
 			#go south to finish point
-			while( True ):
+			while( currentPos != getCircuitEndPos() ):
 				returnList.append(South)
 				currentPos = (currentPos[0],currentPos[1]-1)
-				if( currentPos == getCircuitEndPos() ):
-					break
 
-		if( currentPos == getCircuitEndPos() ):
-			returnList.append(East) #last direction connects start to end
-			break
-					
+
+	returnList.append(East) #last direction connects start to end	
 	return returnList
 
-def getZigZagDirectionList():
-	(minX,maxX,minY,maxY) = worldsize.getMinMaxXXYY()
+def getZigZagDirectionList(inForward):
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
 	currentPos = getZigZagStartPos()
 	directionList = []
-	
+
 	while( True ):
 		if(currentPos == getZigZagStartPos()):
 			#go east from starting point to maxX
@@ -94,22 +154,20 @@ def getZigZagDirectionList():
 					break
 
 		if( currentPos == (minX,maxY) or currentPos == (maxX,maxY) ):
-			break
+			break #end reached
 
-	directionList.append(None)
-	return directionList
+	if( inForward == True ):
+		directionList.append(None) #add End, otherwise one crop gets left out when planting/harvesting at move
+		return directionList
 
-
-def reverseZigZag(directionList):
 	reverseDirectionList = []
-	
+
 	oppositeDirectionSet = {North:South, South:North, East:West, West:East}
-		
-	while (len(directionList) > 0):
+
+	while ( len(directionList) > 0 ):
 		direction =	directionList.pop()
-		if(direction in oppositeDirectionSet):
-			oppositeDirection = oppositeDirectionSet[direction]
-			reverseDirectionList.append(oppositeDirection)
+		oppositeDirection = oppositeDirectionSet[direction]
+		reverseDirectionList.append(oppositeDirection)
 
 	reverseDirectionList.append(None)
 	return reverseDirectionList
@@ -147,8 +205,8 @@ def moveToPos(targetPos):
 		return False
 
 	for dir in directionList:
-		if( move(dir) == False ):
-			return False
+		if( dir != None ):
+			move(dir)
 	return True
 
 def moveWithDirectionList(directionList):
@@ -156,7 +214,48 @@ def moveWithDirectionList(directionList):
 		return False
 
 	for dir in directionList:
-		if( move(dir) == False):
-			return False
+		if( dir != None ):
+			move(dir)
 	return True
+
+def doBenchmark():
+	pos = getOverlapStartPos()
+	moveToPos(pos)
 	
+	preTick = get_tick_count()
+	for dir in overlapList:
+		move(dir)
+	postTick = get_tick_count()
+	quick_print("overlap took",postTick-preTick,"ms")
+	
+	pos = getCircuitStartPos()
+	moveToPos(pos)
+	
+	preTick = get_tick_count()
+	for dir in circuitList:
+		move(dir)
+	postTick = get_tick_count()
+	quick_print("circuit took",postTick-preTick,"ms")
+
+	pos = getZigZagStartPos()
+	moveToPos(pos)
+	
+	preTick = get_tick_count()
+	for dir in zigZagList:
+		if(dir != None):
+			move(dir)
+	postTick = get_tick_count()
+	quick_print("zigzag took",postTick-preTick,"ms")
+
+	pos = getZigZagEndPos()
+	moveToPos(pos)
+	
+	preTick = get_tick_count()
+	for dir in zigZagReverseList:
+		if(dir != None):
+			move(dir)
+	postTick = get_tick_count()
+	quick_print("zigzag in reverse took",postTick-preTick,"ms")
+
+if( isInitialized == False ):
+	init()

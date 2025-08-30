@@ -1,20 +1,21 @@
 def attemptAutoUnlock():
+	unlockSet = getUnlocksLeft()
 	unlockCount = 0
-	for u in Unlocks:
-		costDict = get_cost(u)
-		if( len(costDict) == 0):
-			continue
-		
+
+	for unlock in unlockSet:
+		costDict = get_cost(unlock)
 		isUnlockable = True
-		for i in costDict:
-			cost = costDict[i]
-			if( cost > num_items(i) ):
+
+		for item in costDict:
+			cost = costDict[item]
+			if( cost > num_items(item) ):
 				isUnlockable = False
 
 		if(isUnlockable):
 			quick_print("unlocked",u)
 			unlock(u)
 			unlockCount = unlockCount+1
+
 	return unlockCount
 
 def getUnlocksLeft():

@@ -1,13 +1,27 @@
 import mover
 import planter
-import worldsize
+import misc
 
-timeDict = {} #gettime when planted
-sizeDict = {} #location and size
-
+isInitialized = False
+timeDict = {} #stores the time when planted
+sizeDict = {} #stores the size of the sunflower
+	
 def init():
-	timeDict = {} #gettime when planted
-	sizeDict = {} #location and size
+	quick_print("sunflower.init() was called")
+	
+	global isInitialized
+	global timeDict #stores the time when planted
+	global sizeDict #stores the size of the sunflower
+	
+	isInitialized = True
+	timeDict = {}
+	sizeDict = {}
+
+def initEntity(pos):
+	if( pos in timeDict):
+		timeDict.pop(pos)
+	if( pos in sizeDict):
+		sizeDict.pop(pos)
 
 def getHarvestSet( ):
 	#this set will contain all of the unique sizes on the grid, in unsorted order
@@ -64,58 +78,71 @@ def getHarvestSet( ):
 	
 
 def autoFarm():
-	init() 
-	
+	if( isInitialized == False):
+		init() #sunflower initialize default values
+
 	mover.moveToPos( mover.getZigZagStartPos() )
 	
-	directionList = mover.getZigZagDirectionList()
-	
 	fertilizeAll = planter.canAffordFertilize( num_items(Items.Fertilizer) )
-
-	irrigateLevel = planter.getIrrigateLevel( num_items(Items.Water) )
-	
-	for dir in directionList:
-		if( planter.plantHere(Entities.Sunflower) == True ):
-			pos = ( get_pos_x(),get_pos_y() )
-			timeDict[pos] = get_time()
-			sizeDict[pos] = measure()
-		else:
-			return False
-
-		if(fertilizeAll == True):
-			planter.fertilizeHere()
-
-		if(irrigateLevel > 0):
-			planter.irrigateHere(irrigateLevel)
-
-		if(dir != None):
-			move(dir)
 
 	unfertilizeAll = False
 	if( fertilizeAll == True and planter.canAffordUnfertilize( num_items(Items.Weird_Substance) ) ):
 		unfertilizeAll = True
 
-	if( unfertilizeAll == True ):
-		directionList = mover.reverseZigZag(directionList)
+	irrigateLevel = planter.getIrrigateLevel( num_items(Items.Water) )
+	
+	runState = 0
+	runCount = 0
+	moveList = []
 
-		for dir in directionList:
-			planter.unFertilizeHere()
-			
+	while( runState < 2 ):
+		if( misc.isEven(runCount) ):
+			moveList = mover.zigZagList
+		else:
+			moveList = mover.zigZagReverseList
+		runCount = runCount+1 #next movements will be in opposite direction
+
+		for dir in moveList:
+			if(runState == 0):
+				if( planter.plantHere(Entities.Sunflower) == False ):
+					return False
+
+				pos = ( get_pos_x(),get_pos_y() )
+				timeDict[pos] = get_time()
+				sizeDict[pos] = measure()
+
+				if(fertilizeAll == True):
+					planter.fertilizeHere()
+
+				if(irrigateLevel > 0):
+					planter.irrigateHere(irrigateLevel, False)
+			elif(runState == 1):
+				planter.unFertilizeHere()
+				
 			if(dir != None):
 				move(dir)
+
+		if(runState == 0): #plant and fertilize
+			if( unfertilizeAll == True):
+				runState = 1 # do un-fertilize
+			else:
+				runState = 2 # skip un-fertilize
+		elif(runState == 1): #un-fertilize
+			runState = 2
+		elif(runState == 2): #harvest (unused state)
+			pass
 
 	harvestSet = getHarvestSet()
 	for pos in harvestSet:
 		mover.moveToPos(pos)
 
-		while(True):
-			if ( can_harvest() ):
-				if(planter.harvestHere() == True):
-					if( pos in timeDict):
-						timeDict.pop(pos)
-					if( pos in sizeDict):
-						sizeDict.pop(pos)
-				break
-			else:
-				planter.irrigateHere(irrigateLevel)
+		while( can_harvest() == False ):
+			planter.irrigateHere(irrigateLevel, False)
+
+		if( planter.harvestHere() == True ):
+			initEntity(pos)
+
 	return True
+
+if(isInitialized == False):
+	init()

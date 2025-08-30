@@ -1,40 +1,48 @@
-import worldsize
 import mover
+import misc
 
 def autoFarm():
-	runState = 0
-	
 	mover.moveToPos( mover.getCircuitStartPos() )
 	
-	directionList = mover.getCircuitDirectionList()
-
-	while(True):
-		pumpkinCount = 0
+	runState = 0
+	while( runState < 3 ):
+		pumpkinCount = 0 #contains how many pumpkins there are
 		
-		for dir in directionList: #plant all pumpkins
-			if(runState == 0):	
+		for dir in mover.circuitList: #plant all pumpkins
+			if(runState == 0): #plant pumpkins
 				if( get_entity_type() != Entities.Pumpkin):
 					plant(Entities.Pumpkin)
 					
-					if( num_items(Items.Water) > 0 and get_water() < 0.25):
+					if( num_items(Items.Water) > 0 and get_water() < 0.5):
 						use_item(Items.Water)					
-			elif(runState == 1):
+			elif(runState == 1 or runState == 2): #count pumpkins, twice 
 				if( get_entity_type() != Entities.Pumpkin):				
 					plant(Entities.Pumpkin)
-					if( num_items(Items.Water) > 0 and get_water() < 0.25):
-						use_item(Items.Water)
-
-					runState = runState-1
+					runState = 0 #plant pumpkins
 				else:
-					pumpkinCount = pumpkinCount+1
-			if( (get_pos_x(),get_pos_y()) == mover.getCircuitEndPos()):
-				if(runState == 0):
-					runState = runState+1
-				elif(runState == 1):
-					if(pumpkinCount == worldsize.getEntityMaxCount()):
-						if( can_harvest() and harvest() == True):
-							return True
-					else:
-						runState = runState-1
-			move(dir)
+					pumpkinCount = pumpkinCount+1 #add one pumpkin to the count					
+			
+			if( dir != None ):
+				move(dir)
 
+		#reached end
+		if(runState == 0): #plant pumpkins
+			runState = runState+1
+		elif(runState == 1): #count pumpkins
+			if( pumpkinCount < misc.getEntityMaxCount() ):
+				runState = 0
+			else:
+				runState = runState + 1
+		elif(runState == 2):
+			if( pumpkinCount < misc.getEntityMaxCount() ):
+				runState = 0
+			else:
+				while( can_harvest() == False ):
+					pass
+		
+				if( harvest() == True ):
+					runState = runState + 1
+				else:
+					return False #error
+
+	return True
