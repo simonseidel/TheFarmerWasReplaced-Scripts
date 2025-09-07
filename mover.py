@@ -1,38 +1,26 @@
 import misc
 
-isInitialized = False
-overlapList = []
-overlapList = []
-circuitList = []
-zigZagList = []
-zigZagReverseList = []
 usedWorldSize = None
+overlapDict = {} #(x,y) = [directions]
+circuitDict = {} #(x,y) = direction
+zigZagDict = {} #(x,y,isForward) = direction
 
 def init( ):
 	quick_print("mover.init() was called")
 
-	if( misc.isOdd( get_world_size() ) ):
-		quick_print("mover: world decreased to even size")
-		set_world_size( get_world_size()-1 )
-	
-	global isInitialized
-	global overlapList
-	global circuitList
-	global zigZagList
-	global zigZagReverseList
 	global usedWorldSize
-	
-	isInitialized = True
-	overlapList = []
-	circuitList = []
-	zigZagList = []
-	zigZagReverseList = []
+	global overlapDict
+	global circuitDict
+	global zigZagDict
+
 	usedWorldSize = get_world_size()
+	overlapDict = {}
+	circuitDict = {}
+	zigZagDict = {}
 	
-	overlapList = getOverlapDirectionList()
-	circuitList = getCircuitDirectionList()
-	zigZagList = getZigZagDirectionList(True)
-	zigZagReverseList = getZigZagDirectionList(False)
+	buildOverlapDirections()
+	buildCircuitDirectionList()
+	buildZigZagDirectionList()
 
 def getOverlapStartPos():
 	return (0,0)
@@ -53,124 +41,158 @@ def getZigZagEndPos():
 	else:
 		return (maxX,maxY)
 
-def getOverlapDirectionList():
-	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
-	currentPos = getOverlapStartPos()
-	returnList = []
+def buildOverlapDirections():
+	global overlapDict
+	overlapDict = {}
 	
+	if( num_unlocked(Unlocks.Expand) == 0): 
+		return False #Unlocks.Expand 0 = 1 square
+	
+	currentPos = getOverlapStartPos()
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+	
+	if(num_unlocked(Unlocks.Expand) == 1):
+		#Unlocks.Expand 1 = 3 squares vertical
+		overlapDict[ (0,0) ] = [North]
+		overlapDict[ (0,1) ] = [North]
+		overlapDict[ (0,2) ] = [North]
+		return True
+
 	while( True ):
 		if( currentPos[1] == minY ):
 			while( currentPos[1] < maxY ):
-				returnList.append(North)
+				overlapDict[currentPos] = [North]
 				currentPos = (currentPos[0],currentPos[1]+1)
 
 		if( currentPos[1] == maxY ):
-			returnList.append(North) #next row
-			returnList.append(East) #next column
-			
+			overlapDict[currentPos] = [North,East]			
+				
 			if( currentPos[0] == maxX ):
-				currentPos = getOverlapStartPos()
 				break
 			else:
 				currentPos = (currentPos[0]+1,minY)
+	return True
 
-	return returnList
+def buildCircuitDirectionList():
+	global circuitDict
+	circuitDict = {}
 
-def getCircuitDirectionList():
 	if misc.isOdd( usedWorldSize ):
-		return None #not possible
+		return False #not possible
 
-	returnList = []
-	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
+	if( num_unlocked(Unlocks.Expand) == 0): 
+		return False #Unlocks.Expand 0 = 1 square
 
+	elif(num_unlocked(Unlocks.Expand) == 1): 
+		return False #Unlocks.Expand 1 = 3 squares vertical
+
+	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()	
 	currentPos = getCircuitStartPos()
-	while( currentPos[0] < maxX ):
-		returnList.append(East)
-		currentPos = (currentPos[0]+1,currentPos[1])
 
+	while( currentPos[0] < maxX ):
+		circuitDict[currentPos] = East
+		currentPos = (currentPos[0]+1,currentPos[1])
+	
 	while( currentPos != getCircuitEndPos() ):
 		if(currentPos[0] == maxX and currentPos[1] < maxY):
 			#go north, then west
-			returnList.append(North)
+			circuitDict[currentPos] = North
 			currentPos = (currentPos[0],currentPos[1]+1)
 			while(True):
-				returnList.append(West)
+				circuitDict[currentPos] = West
 				currentPos = (currentPos[0]-1,currentPos[1])
 				if( currentPos == (minX,maxY) ):
 					break
 				elif( currentPos[0] == minX+1 and currentPos[1] < maxY ):
 					break
-	
+		
 		if(currentPos[0] == minX+1 and currentPos[1] < maxY):
 			#go north, then east
-			returnList.append(North)
+			circuitDict[currentPos] = North
 			currentPos = (currentPos[0],currentPos[1]+1)
 			while( currentPos[0] < maxX ):
-				returnList.append(East)
+				circuitDict[currentPos] = East
 				currentPos = (currentPos[0]+1,currentPos[1])
-
+	
 		if( currentPos == (minX,maxY) ):
 			#go south to finish point
 			while( currentPos != getCircuitEndPos() ):
-				returnList.append(South)
-				currentPos = (currentPos[0],currentPos[1]-1)
+				circuitDict[currentPos] = South
+				currentPos = (currentPos[0],currentPos[1]-1)	
+	
+	circuitDict[ getCircuitEndPos() ] = East #last direction connects end to start	
+	return True
 
+def buildZigZagDirectionList():
+	global zigZagDict
+	zigZagDict = {}
+	
+	if( num_unlocked(Unlocks.Expand) == 0 ): 
+		return False #Unlocks.Expand 0 = 1 square
 
-	returnList.append(East) #last direction connects start to end	
-	return returnList
+	if( num_unlocked(Unlocks.Expand) == 1):
+		#Unlocks.Expand 1 = 3 squares vertical
+		zigZagDict[ (0,0,True) ] = North
+		zigZagDict[ (0,0,False) ] = None
+		
+		zigZagDict[ (0,1,True) ] = North
+		zigZagDict[ (0,1,False) ] = South
+		
+		zigZagDict[ (0,2,True) ] = None
+		zigZagDict[ (0,2,False) ] = South
+		return True
 
-def getZigZagDirectionList(inForward):
 	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
 	currentPos = getZigZagStartPos()
-	directionList = []
+	
+	endX,endY = getZigZagEndPos()
+	zigZagDict[ (endX,endY,True) ] = None #add none direction to forward end
 
+	startX,startY = getZigZagStartPos()
+	zigZagDict[ (startX,startY,False) ] = None #add none direction to backwards end
+	
 	while( True ):
 		if(currentPos == getZigZagStartPos()):
 			#go east from starting point to maxX
 			while( True ):
-				directionList.append(East)
+				zigZagDict[ (currentPos[0],currentPos[1],True) ] = East	
 				currentPos = (currentPos[0]+1,currentPos[1])
+				zigZagDict[ (currentPos[0],currentPos[1],False) ] = West
+
 				if( currentPos[0] == maxX ):
 					break
 
 		if(currentPos[0] == maxX and currentPos[1] < maxY):
 			#go north, then west
-			directionList.append(North)
+			zigZagDict[ (currentPos[0],currentPos[1],True) ] = North
 			currentPos = (currentPos[0],currentPos[1]+1)
+			zigZagDict[ (currentPos[0],currentPos[1],False) ] = South
+
 			while(True):
-				directionList.append(West)
+				zigZagDict[ (currentPos[0],currentPos[1],True) ] = West
 				currentPos = (currentPos[0]-1,currentPos[1])
+				zigZagDict[ (currentPos[0],currentPos[1],False) ] = East
+
 				if( currentPos[0] == minX ):
 					break
 	
 		if(currentPos[0] == minX and currentPos[1] < maxY):
 			#go north, then east
-			directionList.append(North)
+			zigZagDict[ (currentPos[0],currentPos[1],True) ] = North
 			currentPos = (currentPos[0],currentPos[1]+1)
+			zigZagDict[ (currentPos[0],currentPos[1],False) ] = South
+			
 			while(True):
-				directionList.append(East)
+				zigZagDict[ (currentPos[0],currentPos[1],True) ] = East
 				currentPos = (currentPos[0]+1,currentPos[1])
+				zigZagDict[ (currentPos[0],currentPos[1],False) ] = West
+
 				if(currentPos[0] == maxX):
 					break
 
-		if( currentPos == (minX,maxY) or currentPos == (maxX,maxY) ):
+		if( currentPos == getZigZagEndPos() ):
 			break #end reached
-
-	if( inForward == True ):
-		directionList.append(None) #add End, otherwise one crop gets left out when planting/harvesting at move
-		return directionList
-
-	reverseDirectionList = []
-
-	oppositeDirectionSet = {North:South, South:North, East:West, West:East}
-
-	while ( len(directionList) > 0 ):
-		direction =	directionList.pop()
-		oppositeDirection = oppositeDirectionSet[direction]
-		reverseDirectionList.append(oppositeDirection)
-
-	reverseDirectionList.append(None)
-	return reverseDirectionList
+	return True
 
 def getDirectionList(startPos, targetPos):
 	directionList = []
@@ -205,57 +227,5 @@ def moveToPos(targetPos):
 		return False
 
 	for dir in directionList:
-		if( dir != None ):
-			move(dir)
-	return True
-
-def moveWithDirectionList(directionList):
-	if( len(directionList) == 0):
-		return False
-
-	for dir in directionList:
-		if( dir != None ):
-			move(dir)
-	return True
-
-def doBenchmark():
-	pos = getOverlapStartPos()
-	moveToPos(pos)
-	
-	preTick = get_tick_count()
-	for dir in overlapList:
 		move(dir)
-	postTick = get_tick_count()
-	quick_print("overlap took",postTick-preTick,"ms")
-	
-	pos = getCircuitStartPos()
-	moveToPos(pos)
-	
-	preTick = get_tick_count()
-	for dir in circuitList:
-		move(dir)
-	postTick = get_tick_count()
-	quick_print("circuit took",postTick-preTick,"ms")
-
-	pos = getZigZagStartPos()
-	moveToPos(pos)
-	
-	preTick = get_tick_count()
-	for dir in zigZagList:
-		if(dir != None):
-			move(dir)
-	postTick = get_tick_count()
-	quick_print("zigzag took",postTick-preTick,"ms")
-
-	pos = getZigZagEndPos()
-	moveToPos(pos)
-	
-	preTick = get_tick_count()
-	for dir in zigZagReverseList:
-		if(dir != None):
-			move(dir)
-	postTick = get_tick_count()
-	quick_print("zigzag in reverse took",postTick-preTick,"ms")
-
-if( isInitialized == False ):
-	init()
+	return True

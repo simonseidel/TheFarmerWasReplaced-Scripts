@@ -2,43 +2,55 @@ import mover
 import planter
 import misc
 
-isInitialized = False
 mainSet = set() #only planted main entities
 companionSet = set() #only planted companions
-companionDict = set() #unplanted companions
+companionDict = {} #unplanted companions
 
 def init():
 	quick_print("polyculture.init() was called")
 	
-	global isInitialized
 	global mainSet #only planted main entities
 	global companionSet #only planted companions
 	global companionDict #unplanted companions
 
-	isInitialized = True
 	mainSet = set()
-	companionSet = set() 
+	companionSet = set()
 	companionDict = {}
 
 def autoFarmEntity(entity):
-	runCount = 0
-	runState = 0
-	moveList = []
-	mover.moveToPos( mover.getZigZagStartPos() )
+	if( planter.canAffordEntity(entity, misc.getEntityMaxCount() ) == False ):
+		return False
 
-	useFertilizer = planter.canAffordFertilize( num_items(Items.Fertilizer) )
-	useUnFertilizer = useFertilizer == True and planter.canAffordUnfertilize( num_items(Items.Weird_Substance) )
-	irrigateLevel = planter.getIrrigateLevel( num_items(Items.Water) )
+	if( planter.usedWorldSize != get_world_size() ):
+		planter.init()
+	
+	if( mover.usedWorldSize != get_world_size() ):
+		mover.init()
+
+	init() #init polyculture
+	
+	runState = 0
+	moveForward = True
+
+	togglePoly = num_unlocked(Unlocks.Polyculture) > 0
+
+	useFertilizer = num_unlocked(Unlocks.Fertilizer) > 0 and planter.canFertilize( misc.getEntityMaxCount() )
+
+	useUnFertilizer = useFertilizer == True and planter.canUnfertilize( misc.getEntityMaxCount() )
+
+	irrigateLevel = 0
+	if( num_unlocked(Unlocks.Watering) > 0 ):
+		irrigateLevel = planter.getIrrigateLevel( misc.getEntityMaxCount() )
+
+	mover.moveToPos( mover.getZigZagStartPos() )
 	
 	while( runState < 5):
-		if( misc.isEven(runCount) ):
-			moveList = mover.zigZagList
-		else:
-			moveList = mover.zigZagReverseList
-		runCount = runCount+1 #next movements will be in opposite direction
-
-		for dir in moveList:
+		moveToggled = True
+		
+		while( moveToggled == True ):
 			if(runState == 0): #plant
+				planter.harvestHere()
+
 				if( entity == Entities.Tree and planter.plantHere(Entities.Tree) == False ):
 					planter.plantHere(Entities.Grass)
 				elif(entity != Entities.Tree):
@@ -46,13 +58,14 @@ def autoFarmEntity(entity):
 		
 				mainSet.add( (get_pos_x(),get_pos_y()) )
 		
-				myCompanion = get_companion()
-				if( myCompanion != None):
-					(myCompanionEntity, (myCompanionX,myCompanionY)) = myCompanion
-					companionDict[(myCompanionX,myCompanionY)] = myCompanionEntity
-				
+				if( togglePoly == True ):
+					myCompanion = get_companion()
+					if( myCompanion != None):
+						(myCompanionEntity, (myCompanionX,myCompanionY)) = myCompanion
+						companionDict[(myCompanionX,myCompanionY)] = myCompanionEntity
+
 				if(irrigateLevel > 0):
-					planter.irrigateHere(irrigateLevel, False)
+					planter.irrigateHere(irrigateLevel)
 			
 				if(useFertilizer == True):
 					planter.fertilizeHere()
@@ -64,7 +77,7 @@ def autoFarmEntity(entity):
 				pos = ( get_pos_x(),get_pos_y() ) 
 				if( pos in companionDict ):	
 					companionEntity = companionDict[pos]
-					if not( planter.canAffordToPlant(companionEntity, 1) ):
+					if not( planter.canAffordEntity(companionEntity, 1) ):
 						companionDict.pop(pos)
 					else:
 						if( can_harvest() ):
@@ -79,10 +92,10 @@ def autoFarmEntity(entity):
 							companionDict.pop(pos)
 							companionSet.add(pos)
 	
-				if(len(companionDict) == 0): #out of companions to plant
+				if( len(companionDict) == 0 ): #out of companions to plant
 					runState = runState+1 
 		
-			elif(runState == 3): #harvest main
+			elif( runState == 3 ): #harvest main
 				pos = (get_pos_x(),get_pos_y())
 				if( pos in mainSet ):
 					if( can_harvest() ):
@@ -90,7 +103,11 @@ def autoFarmEntity(entity):
 						mainSet.remove(pos)
 	
 				if( len(mainSet) == 0): #out of main crops to harvest
-					runState = runState+1
+					if(togglePoly == True):
+						runState = 4
+					else:
+						runState = 5
+						moveToggled = False
 
 			elif(runState == 4): #harvest companions
 				pos = (get_pos_x(),get_pos_y())
@@ -98,22 +115,34 @@ def autoFarmEntity(entity):
 					if( can_harvest() ):
 						planter.harvestHere()
 						companionSet.remove(pos)
-					
+
 				if( len(companionSet) == 0):
 					runState = runState+1
-					break
-
-			if(dir != None):
-				move(dir)
+					moveToggled = False
+			
+			moveDirection = mover.zigZagDict[ (get_pos_x(), get_pos_y(), moveForward) ]
+			if( moveDirection == None ):
+				moveToggled = False
+				moveForward = not moveForward
+			
+			if( moveToggled == True ):
+				move(moveDirection)
 
 		if(runState == 0): #plant main crops
 			if(useUnFertilizer == True):
-				runState = 1 #do unfertilize
+				runState = 1
 			else:
-				runState = 2 #skip unfertilize
-		
+				if( togglePoly == True ):
+					runState = 2 
+				else:
+					runState = 3
+
 		elif(runState == 1): #unfertilize
-			runState = runState+1
+			if( togglePoly == True ):
+				runState = 2
+			else:
+				runState = 3
+
 		elif(runState == 2): #plant companions
 			pass
 		elif(runState == 3): #harvest main
@@ -121,9 +150,6 @@ def autoFarmEntity(entity):
 		elif(runState == 4): #harvest companion
 			pass
 		elif(runState == 5): #finished (unused)
-			break
+			pass
 
 	return True
-	
-if(isInitialized == False):
-	init()

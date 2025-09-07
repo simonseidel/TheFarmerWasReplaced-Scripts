@@ -22,7 +22,6 @@ def init( doOptimization ):
 	directionList = [North,East,South,West]
 	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
 	
-
 	addUnknownCount = 0
 	for idx in range( misc.getEntityMaxCount() ):
 		x = (idx % get_world_size())
@@ -58,13 +57,6 @@ def saveMove(moveSuccessful, moveDirection, fromPos):
 			successDirectionSet.remove( (fromX,fromY,moveDirection) )
 
 	return True #success
-
-
-def canAffordCreate():
-	substanceAmountRequired = get_world_size() * num_unlocked(Unlocks.Mazes)
-	if(substanceAmountRequired > num_items(Items.Weird_Substance)):
-		return False
-	return True
 
 def getPosFromDirection(fromPos, direction):
 	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
@@ -130,22 +122,33 @@ def getSuccessDirectionsAtPos(x,y):
 			successDirectionList.append(dir)
 	return successDirectionList
 
-def listToSet(inputList):
-	returnSet = set()
-	for stuff in inputList:
-		returnSet.add(stuff)
-	return returnSet
-	
-def createMaze():
-	plant(Entities.Bush)
-	use_item(Items.Weird_Substance, get_world_size() * num_unlocked(Unlocks.Mazes))
-	return True
-
-def autoPathFind( ):
-	if(createMaze() == False):
+def createMaze( mazeSize ):
+	if( num_unlocked(Unlocks.Mazes) == 0 ):
+		return False
+	if( num_unlocked(Unlocks.Fertilizer) == 0 ):
+		return False
+	if( num_unlocked(Unlocks.Plant) == 0 ):
 		return False
 
-	init( False )
+	itemRequired = Items.Weird_Substance
+	substanceRequired = mazeSize * num_unlocked(Unlocks.Mazes)
+	if( substanceRequired > num_items(itemRequired) ):
+		return False
+
+	clear()
+	if( plant(Entities.Bush) == False):
+		return False
+
+	if( use_item(itemRequired, substanceRequired) == False ):
+		return False
+
+	return True
+
+def findTreasure( mazeSize = get_world_size() ):
+	if( createMaze( mazeSize ) == False ):
+		return False
+
+	init( False ) #parameter is doOptimization True/False
 	
 	getEntity = get_entity_type()
 	fromX = get_pos_x()
@@ -179,7 +182,7 @@ def autoPathFind( ):
 					moveDirection = successDir[randomIdx] 
 				else:
 					moveDirection = turnDegrees(lastDirection, 90)
-					successSet = listToSet(successDir) #get successful directions, but in a set
+					successSet = misc.listToSet(successDir) #get successful directions, but in a set
 
 					while( not moveDirection in successSet ):
 						moveDirection = turnDegrees(moveDirection, 90)	
@@ -188,7 +191,7 @@ def autoPathFind( ):
 				break #all paths are explored but all failed (error)
 
 		if(moveDirection == None):
-			init( False )
+			init( False ) #parameter is doOptimization True/False
 			quick_print("failed to find a move")
 			continue
 
@@ -216,10 +219,11 @@ def autoPathFind( ):
 		lastDirectionDict[(fromX,fromY)] = moveDirection
 		
 		(fromX,fromY) = getPosFromDirection( (fromX,fromY), moveDirection )
-#		if( (fromX,fromY) != ( get_pos_x(),get_pos_y() ) ):
-#			quick_print("ERROR position is off!")
+		if( (fromX,fromY) != ( get_pos_x(),get_pos_y() ) ):
+			quick_print("ERROR: position is off!")
 
 		getEntity = get_entity_type()
 
-	harvest()
+	harvest() #this destroys the maze regardless if at treasure or not
+	
 	return getEntity == Entities.Treasure

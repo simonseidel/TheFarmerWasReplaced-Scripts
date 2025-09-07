@@ -1,62 +1,70 @@
 import mover
 import misc
 
-isInitialized = False #has init been run?
+usedWorldSize = None
 isPlantedSet = set() #plant or empty
 fertilizedSet = set() #a set containing only fertilized entitites
 infectedSet = set() #a set containing only infected entities
-entityTypeDict = {} #dictionary containing all of the planted entities
-groundTypeDict = {} #dictionary containing all of the ground types
-waterLevelDict = {} #dictionary containing latest water level
+treeSet = set() #a set containing all trees planted
 
 def init():
 	quick_print("planter.init() was called")
 
-	global isInitialized
+	global usedWorldSize
 	global isPlantedSet
 	global fertilizedSet
 	global infectedSet
-	global entityTypeDict 
-	global groundTypeDict
-	global waterLevelDict
+	global treeSet
 	
-	isInitialized = True
+	usedWorldSize = get_world_size()
 	isPlantedSet = set()
 	fertilizedSet = set() 
 	infectedSet = set() 
-	entityTypeDict = {}
-	groundTypeDict = {}
-	waterLevelDict = {}
+	treeSet = set()
+	
+#	clear()
+#	for idx in range( misc.getEntityMaxCount() ):
+#		x = (idx % get_world_size())
+#		y = (idx / get_world_size()) // 1
+#		isPlantedSet.add((x,y))
 
-	clear()
+def canFertilize( entityCount ):
+	if( num_unlocked(Unlocks.Fertilizer) == 0 ):
+		return False
 
-	for idx in range( misc.getEntityMaxCount() ):
-		x = (idx % get_world_size())
-		y = (idx / get_world_size()) // 1
+	return num_items(Items.Fertilizer) >= entityCount
 
-		groundTypeDict[(x,y)] = Grounds.Grassland
-		entityTypeDict[(x,y)] = Entities.Grass
-		isPlantedSet.add((x,y))
+def canUnfertilize( entityCount ):
+	if( num_unlocked(Unlocks.Fertilizer) == 0 ):
+		return False
 
-def canAffordFertilize( fertilizerInventory ):
-	return fertilizerInventory >= misc.getEntityMaxCount()
+	return num_items(Items.Weird_Substance) >= entityCount
 
-def canAffordUnfertilize( weirdsubstanceInventory ):
-	return weirdsubstanceInventory >= misc.getEntityMaxCount()
+def getEntityCost(plantEntity, entityCount):
+	entityCost = get_cost(plantEntity)
+	if( entityCost == None or len(entityCost) == 0 ):
+		return None
 
-def canAffordToPlant(plantEntity, entityAmount):
+	for item in entityCost:	
+		multipleCost = entityCost[item] * entityCount
+		entityCost[item] = multipleCost
+	
+	return entityCost
+
+def canAffordEntity(plantEntity, entityCount):
 	entityCost = get_cost(plantEntity)
 	if( entityCost == None or len(entityCost) == 0 ):
 		return True #not plantable or free
 	
 	for item in entityCost:	
-		cost = entityCost[item] * entityAmount
+		cost = entityCost[item] * entityCount
 		if( cost > num_items(item) ):
 			return False #costs, and can not afford
 	return True #costs, but can afford
 
-def getIrrigateLevel( waterItemCount ):
-	waterRequired = misc.getEntityMaxCount()
+def getIrrigateLevel( entityCount ):
+	waterItemCount = num_items(Items.Water)
+	waterRequired = entityCount
 
 	if( waterItemCount >= waterRequired*4 ):
 		irrigateLevel = 1
@@ -70,32 +78,25 @@ def getIrrigateLevel( waterItemCount ):
 		irrigateLevel = 0
 	return irrigateLevel
 
-def irrigateHere( waterLevel, updateData ):
+def irrigateHere( waterLevel ):
 	if(waterLevel < 0):
 		waterLevel = 0
 	elif(waterLevel > 1):
 		waterLevel = 1
 
-	while(get_water() < waterLevel and num_items(Items.Water) > 0):
+	while(waterLevel > 0 and get_water() < waterLevel and num_items(Items.Water) > 0):
 		use_item(Items.Water)
-
-	if( updateData ):
-		waterLevelDict[ (get_pos_x(),get_pos_y()) ] = get_water()
 
 def plantHere(entity):
 	tillHere(Grounds.Soil)
 
-	if not(get_entity_type() == None):
+	if not( get_entity_type() == None ):
 		return False
 
 	if(entity == Entities.Tree):
 		thisSet = getSurroundingSet( get_pos_x(),get_pos_y() )
 		for pos in thisSet:
-			if not pos in entityTypeDict:
-				continue
-
-			thisEntity = entityTypeDict[pos]
-			if(thisEntity == Entities.Tree):
+			if pos in treeSet:
 				return False #trees must be planted sparse
 
 	if(plant(entity) == False):
@@ -103,21 +104,26 @@ def plantHere(entity):
 
 	pos = (get_pos_x(),get_pos_y())
 	isPlantedSet.add(pos)
-	entityTypeDict[pos] = entity
-	
+	if(entity == Entities.Tree):
+		treeSet.add(pos)
+
 	return True
 
 def harvestHere():
-	if(harvest() == False):
+	if( harvest() == False ):
 		return False
 
 	thisGroundType = get_ground_type()
 	pos = ( get_pos_x(),get_pos_y() )
 
-	if( thisGroundType != Grounds.Grassland):
-		entityTypeDict[pos] = None
+	if( thisGroundType == Grounds.Grassland ):
+		pass
+	else:
 		if pos in isPlantedSet:
 			isPlantedSet.remove(pos)
+
+	if pos in treeSet:
+		treeSet.remove(pos)
 
 	if pos in infectedSet:
 		infectedSet.remove(pos)
@@ -127,7 +133,7 @@ def harvestHere():
 	
 	return True
 
-def tillHere(targetGroundType):
+def tillHere( targetGroundType ):
 	thisGroundType = get_ground_type()
 	thisEntity = get_entity_type()
 	shouldTill = thisGroundType != targetGroundType
@@ -140,25 +146,15 @@ def tillHere(targetGroundType):
 
 	if( shouldTill ):
 		pos = ( get_pos_x(),get_pos_y() )
-		groundTypeDict[pos] = targetGroundType
 
 		if( targetGroundType == Grounds.Grassland ):
-			entityTypeDict[pos] = Entities.Grass
+			isPlantedSet.add(pos)
 		else:
-			entityTypeDict[pos] = None
 			if pos in isPlantedSet:
 				isPlantedSet.remove(pos)
 
 	return shouldTill
 	
-def autoTill(targetGroundType):
-	mover.moveToPos( mover.getZigZagStartPos() )
-	for dir in mover.zigZagList:
-		tillHere(targetGroundType)
-		if(dir != None):
-			move(dir)
-	return True
-
 def getSurroundingSet(x,y):
 	affectedSet = set()
 	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
@@ -227,6 +223,3 @@ def unFertilizeHere( ):
 			infectedSet.remove(pos)
 		else:
 			infectedSet.add(pos)
-
-if(isInitialized == False):
-	init()

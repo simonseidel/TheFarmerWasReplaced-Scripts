@@ -9,5 +9,6 @@ import misc
 import polyculture
 import highscore
 import autocollect
+import weirdsubstance
 
-autocollect.run()
+autocollect.fillInventory()

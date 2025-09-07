@@ -1,5 +1,6 @@
 import misc
 import mover
+import planter
 
 def autoSwap(minX, maxX, minY, maxY):
 	x = get_pos_x()
@@ -17,26 +18,37 @@ def autoSwap(minX, maxX, minY, maxY):
 	return swapCount
 
 def autoFarm():
+	if( num_unlocked(Unlocks.Cactus) == 0 ):
+		return False
+
+	if( planter.canAffordEntity(Entities.Cactus, misc.getEntityMaxCount()) == False ):
+		return False
+
+	if( mover.usedWorldSize != get_world_size() ):
+		mover.init()
+
 	mover.moveToPos( mover.getZigZagStartPos() )
 	
 	(minX,maxX,minY,maxY) = misc.getWorldMinMaxXXYY()
-	
-	runState = 0
-	runCount = 0
-	moveList = []
-	
-	while runState < 2:
-		if( misc.isEven(runCount) ):
-			moveList = mover.zigZagList
-		else:
-			moveList = mover.zigZagReverseList
-		runCount = runCount+1 #next movements will be in opposite direction
 
+	runState = 0
+	isForward = True
+
+	while runState < 2:
 		loopSwapCount = 0
-		for dir in moveList:
+		moveToggled = True
+
+		while( moveToggled == True ):
 			if(runState == 0):
-				if(plant(Entities.Cactus) == False):
+				harvest()
+				
+				if( get_ground_type() != Grounds.Soil):
+					till()
+
+				if( planter.canAffordEntity(Entities.Cactus, 1) == False):
 					return False
+
+				plant(Entities.Cactus)
 			elif(runState == 1):
 				while( True ):
 					thisCount = autoSwap(minX, maxX, minY, maxY)
@@ -45,23 +57,27 @@ def autoFarm():
 
 					loopSwapCount = loopSwapCount + thisCount
 	
-			if(dir != None):
-				move(dir)
+			moveDirection = mover.zigZagDict[(get_pos_x(),get_pos_y(),isForward)]
+			if( moveDirection == None):
+				isForward = not isForward
+				moveToggled = False
+			
+			if(moveToggled == True):
+				move(moveDirection)	
 
 		#reached end
 		if(runState == 0):
 			runState = 1
+		
 		elif(runState == 1):
 			if( loopSwapCount > 0 ):
 				continue
 
 			mover.moveToPos( (minX,minY) )
 
-			while( can_harvest() == False ):
-				pass
-			
-			if( harvest() == False ):
+			if(can_harvest() == False):
 				return False
-
+			
+			harvest()
 			runState = 2
 	return True
